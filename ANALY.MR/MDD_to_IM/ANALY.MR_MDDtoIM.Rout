@@ -1,0 +1,2043 @@
+
+R version 3.3.2 (2016-10-31) -- "Sincere Pumpkin Patch"
+Copyright (C) 2016 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> library("data.table")
+> library('dplyr')
+------------------------------------------------------------------------------
+data.table + dplyr code now lives in dtplyr.
+Please library(dtplyr)!
+------------------------------------------------------------------------------
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:data.table’:
+
+    between, first, last
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+> library('knitr')
+> library('TwoSampleMR')
+Welcome to TwoSampleMR.
+[>] Full documentation: https://mrcieu.github.io/TwoSampleMR
+[>] Check news(package='TwoSampleMR') for bug fixes and updates
+[>] By generating access tokens to retrieve data from the MR-Base
+    database you consent to having your email address logged on
+    our servers. For info on how this is used see logging_info()
+
+> library('MRPRESSO')
+> library("ggplot2")
+> options(bitmapType='cairo')
+> 
+> ls.IM=as.vector(read.table('ls.IMtraits',header = F,stringsAsFactors = F)[,1])
+> 
+> for (f in ls.IM){
++       # file names
++       exposure.fname=paste0('exposure_stats/MDD.exposure_dat')
++       traitA='MDD'
++       traitB=f
++       
++       ## exposure dat
++       exposure_dat=read.table(exposure.fname,header=T)
++       ## outcome dat
++       outcome_dat <- read_outcome_data(file=paste0('outcome_stats/',traitB,".outcome_dat"),sep='\t')
++       
++       # Harmonise the exposure and outcome data
++       dat <- harmonise_data(exposure_dat, outcome_dat)
++       
++       # analyse
++       MR=mr(dat = dat,method_list =c("mr_ivw","mr_egger_regression","mr_weighted_median"))
++       res_single = mr_singlesnp(dat)
++       res_loo = mr_leaveoneout(dat)
++       MR.presso=mr_presso(BetaOutcome = "beta.outcome", BetaExposure = "beta.exposure", 
++                           SdOutcome = "se.outcome", SdExposure = "se.exposure", 
++                           OUTLIERtest = TRUE, DISTORTIONtest = TRUE, 
++                           data = dat, NbDistribution = 3000,  SignifThreshold = 0.05)
++       if (MR.presso$`MR-PRESSO results`$`Global Test`$Pvalue>=0.05){
++             tmp.mr_res=data.frame(MR,mr_pleiotropy_test(dat)[5:7],mr_heterogeneity(dat)[2,6:8],
++                                   MRpresso_RSSobs=MR.presso$`MR-PRESSO results`$`Global Test`$RSSobs,
++                                   MRpresso_Pval=as.character(MR.presso$`MR-PRESSO results`$`Global Test`$Pvalue),
++                                   MRpresso_outliers=NA,MRpresso_distortion_pval=NA)
++       }else{
++             n.outlier=length(MR.presso$`MR-PRESSO results`$`Distortion Test`$`Outliers Indices`)
++             MR=rbind(MR,MR[1,])
++             MR$method=as.character(MR$method)
++             MR$method[4]='MR-Presso_outlier-corrected'
++             MR$nsnp[4]=MR$nsnp[4]-n.outlier
++             MR[4,7:9]=MR.presso$`Main MR results`[2,c(3,4,6)]
++             tmp.mr_res=data.frame(MR,mr_pleiotropy_test(dat)[5:7],mr_heterogeneity(dat)[2,6:8],
++                                   MRpresso_RSSobs=MR.presso$`MR-PRESSO results`$`Global Test`$RSSobs,
++                                   MRpresso_Pval=as.character(MR.presso$`MR-PRESSO results`$`Global Test`$Pvalue),
++                                   MRpresso_outliers=paste0(MR.presso$`MR-PRESSO results`$`Distortion Test`$`Outliers Indices`,collapse=','),
++                                   MRpresso_distortion_pval=MR.presso$`MR-PRESSO results`$`Distortion Test`$Pvalue)
++       }
++       # summarise stats
++       if (f==ls.IM[1]){
++             MRsummary=tmp.mr_res
++       }else{
++             MRsummary=rbind(MRsummary,tmp.mr_res)
++       }
++       
++       # visualise
++       mr_report(dat,output_path='../results/MDD_to_IM/')
++       
++       fig.scatter = mr_scatter_plot(MR, dat)
++       fig.forest = mr_forest_plot(res_single)
++       fig.loo = mr_leaveoneout_plot(res_loo)
++       fig.funnel = mr_funnel_plot(res_single)
++       
++       ggsave(fig.scatter[[1]], file=paste0("../results/MDD_to_IM/figure/",traitA,'_',traitB,"_scatter_plot.png"), width=7, height=7)
++       ggsave(fig.forest[[1]], file=paste0("../results/MDD_to_IM/figure/",traitA,'_',traitB,"_forestr_plot.png"), width=7, height=7)
++       ggsave(fig.loo[[1]], file=paste0("../results/MDD_to_IM/figure/",traitA,'_',traitB,"_loo_plot.png"), width=7, height=7)
++       ggsave(fig.funnel[[1]], file=paste0("../results/MDD_to_IM/figure/",traitA,'_',traitB,"_funnel_plot.png"), width=7, height=7)     
++       system(paste0('echo ',grep(f,ls.IM),' ',traitA,' against ',traitB,'analysis  done >> XS.log'))
++ }
+Harmonising MDD_23_UKB_PGC (eWmbf6) and gFA_Total (Unlxqk)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'Unlxqk'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'Unlxqk'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+Loading required package: markdown
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and gFA_AF (4IMBp6)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on '4IMBp6'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on '4IMBp6'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and gFA_TR (6OaKKY)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on '6OaKKY'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on '6OaKKY'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and gMD_Total (0Bg9Nq)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on '0Bg9Nq'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on '0Bg9Nq'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and gMD_AF (m12JeJ)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'm12JeJ'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'm12JeJ'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and gMD_TR (WmlTRw)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'WmlTRw'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'WmlTRw'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and gICVF_AF (MCYQxl)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'MCYQxl'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'MCYQxl'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tFA_IFOF (rzjTtf)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'rzjTtf'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'rzjTtf'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tFA_ILF (NaMaIE)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'NaMaIE'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'NaMaIE'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tFA_PTR (JhwuEn)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'JhwuEn'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'JhwuEn'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tFA_SLF (wuZE63)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'wuZE63'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'wuZE63'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tFA_FMa (zw5Yc7)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'zw5Yc7'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'zw5Yc7'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tFA_FMi (fkYQPz)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'fkYQPz'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'fkYQPz'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tMD_ATR (xV3AP5)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'xV3AP5'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'xV3AP5'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tMD_CingulateCingulum (HVzOO0)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'HVzOO0'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'HVzOO0'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tMD_IFOF (LgAouI)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'LgAouI'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'LgAouI'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tMD_SLF (c9Ur6v)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'c9Ur6v'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'c9Ur6v'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tMD_STR (27MFde)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on '27MFde'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on '27MFde'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tMD_FMi (XHRN4X)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'XHRN4X'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'XHRN4X'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tICVF_AR (DbhjPW)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'DbhjPW'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'DbhjPW'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tICVF_CingulateCingulum (1Aba53)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on '1Aba53'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on '1Aba53'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tICVF_IFOF (qRuaXe)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'qRuaXe'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'qRuaXe'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tICVF_SLF (Xzl2Gs)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'Xzl2Gs'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'Xzl2Gs'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tICVF_UnF (9rTQXr)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on '9rTQXr'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on '9rTQXr'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and tICVF_FMa (CRx2Ip)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'CRx2Ip'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'CRx2Ip'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and rsamp_N10 (T8EsbE)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'T8EsbE'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'T8EsbE'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+Harmonising MDD_23_UKB_PGC (eWmbf6) and rsamp_N14 (hjGgTa)
+Removing the following SNPs for being palindromic with intermediate allele frequencies:
+rs1933802, rs2247523, rs263645, rs2876520, rs4730387, rs751996
+Analysing 'eWmbf6' on 'hjGgTa'
+Writing report as html file to ../results/MDD_to_IM/
+Performing analysis
+Analysing 'eWmbf6' on 'hjGgTa'
+r.exposure and/or r.outcome not present.
+Calculating approximate SNP-exposure and/or SNP-outcome correlations, assuming all are quantitative traits. Please pre-calculate r.exposure and/or r.outcome using get_r_from_lor() for any binary traits
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Estimating correlation for quantitative trait.
+This method is an approximation, and may be numerically unstable.
+Ideally you should estimate r directly from independent replication samples.
+Use get_r_from_lor for binary traits.
+Generating graphs
+Warning: Ignoring unknown aesthetics: text
+
+
+processing file: /exports/eddie3_homes_local/s1517658/R/x86_64-pc-linux-gnu-library/3.3/TwoSampleMR/reports/mr_report.Rmd
+  |                                                                         |                                                                 |   0%  |                                                                         |....                                                             |   6%
+label: init (with options) 
+List of 1
+ $ echo: logi FALSE
+
+  |                                                                         |........                                                         |  12%
+   inline R code fragments
+
+  |                                                                         |...........                                                      |  18%
+label: chunk1
+  |                                                                         |...............                                                  |  24%
+  ordinary text without R code
+
+  |                                                                         |...................                                              |  29%
+label: chunk2
+  |                                                                         |.......................                                          |  35%
+  ordinary text without R code
+
+  |                                                                         |...........................                                      |  41%
+label: chunk3
+  |                                                                         |...............................                                  |  47%
+  ordinary text without R code
+
+  |                                                                         |..................................                               |  53%
+label: chunk4
+  |                                                                         |......................................                           |  59%
+  ordinary text without R code
+
+  |                                                                         |..........................................                       |  65%
+label: chunk5
+  |                                                                         |..............................................                   |  71%
+  ordinary text without R code
+
+  |                                                                         |..................................................               |  76%
+label: chunk6
+  |                                                                         |......................................................           |  82%
+  ordinary text without R code
+
+  |                                                                         |.........................................................        |  88%
+label: chunk7
+  |                                                                         |.............................................................    |  94%
+  ordinary text without R code
+
+  |                                                                         |.................................................................| 100%
+label: chunk8
+
+output file: mr_report.md
+
+Warning: Ignoring unknown aesthetics: text
+There were 50 or more warnings (use warnings() to see the first 50)
+> write.table(MRsummary,file="../results/MDD_to_IM/outcomes.MRsummary",col.names = T,row.names=F,sep="\t",quot=F)
+> rm(list=ls())
+> 
+> proc.time()
+    user   system  elapsed 
+2794.235    2.759 3075.628 
